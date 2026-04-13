@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bubble Split</string>
+
+    <string name="tab_settings">设置</string>
+    <string name="tab_about">关于</string>
+
+    <string name="setting_permission_title">授权读取应用通知</string>
+    <string name="setting_permission_granted">已授权，将自动生成气泡</string>
+    <string name="setting_permission_denied">未授权，点击开启权限</string>
+    <string name="setting_bubble_title">开启主控台气泡</string>
+    <string name="setting_bubble_desc">发送常驻通知，随时呼出气泡</string>
+    <string name="setting_prevent_dupsplit">授权防止重复拉起 (推荐)</string>
+    <string name="setting_usage_title">授权防止重复拉起 (推荐)</string>
+    <string name="setting_usage_granted">已授权，将自动拦截前台应用</string>
+    <string name="setting_usage_denied">未授权，分屏拉起全屏应用可能会报错</string>
+    <string name="setting_apps_title">常用应用管理</string>
+    <string name="setting_apps_count">已选择 %1$d 个分屏应用</string>
+    <string name="setting_apps_empty">未选择任何应用，点击添加</string>
+
+    <string name="selector_title">订阅应用</string>
+    <string name="selector_done">完成</string>
+    <string name="selector_back">返回</string>
+
+    <string name="about_title">关于</string>
+    <string name="about_version">1.0.0</string>
+    <string name="about_developer">开发者：Grace Chan</string>
+    <string name="about_project_url">项目地址：</string>
+
+    <string name="notif_channel_name">Bubble Notifications</string>
+    <string name="notif_partner_name">应用中心</string>
+    <string name="notif_main_msg">点击右下角的小气泡图标，呼出分屏控制台！</string>
+    <string name="notif_dynamic_msg">点击打开</string>
+    <string name="bubble_empty_state">尚未选择应用。\n请在主应用设置中添加。</string>
+    <string name="toast_cannot_split">该应用已在全屏运行，无法分屏拉起</string>
+</resources>
