@@ -1,5 +1,7 @@
 # Bubble Split
 
+[中文](https://github.com/velviagris/BubbleSplit/blob/master/README-CN.md)
+
 ## About
 
 This is a lightweight application, inspired by Multitasking 'Bubbles' in Android 17 Beta 3 update, and no "Root/Shizuku" needed.
@@ -22,7 +24,7 @@ This is a lightweight application, inspired by Multitasking 'Bubbles' in Android
 
 ## Bugs report
 
-Open an [issue](https://github.com/velviagris/BububleSplit/issues).
+Open an [issue](https://github.com/velviagris/BubbleSplit/issues).
 
 ## License
 
