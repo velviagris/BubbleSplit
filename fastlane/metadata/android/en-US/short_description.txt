@@ -1,0 +1,1 @@
+A lightweight Pop-up view tool for android phones, no "Root/Shizuku" needed.
