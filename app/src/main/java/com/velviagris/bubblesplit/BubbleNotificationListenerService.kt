@@ -1,10 +1,10 @@
 package com.velviagris.bubblesplit
 
+import android.app.Notification
 import android.app.PendingIntent
 import android.content.Intent
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import androidx.compose.ui.res.stringResource
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
@@ -14,23 +14,46 @@ import androidx.core.graphics.drawable.IconCompat
 
 class BubbleNotificationListenerService : NotificationListenerService() {
 
+    companion object {
+        // 记录上次触发气泡强行弹出的时间 (毫秒)
+        private var lastAlertTime = 0L
+        // 冷却勿扰时间：设定为 10 分钟 (用户移除了气泡后，10分钟内同类更新只会在通知栏静默叠加，不会强行霸屏弹出)
+        private const val COOLDOWN_TIME_MS = 10 * 60 * 1000L
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val pkg = sbn.packageName
         if (pkg == packageName) return
 
+        // 【核心优化 1】：拦截“幽灵”通知，解决电脑端处理后手机瞎弹气泡的问题
+        val notification = sbn.notification
+        // 忽略常驻通知 (isOngoing，比如微信的“正在运行”)
+        // 忽略系统自动生成的群组折叠摘要 (FLAG_GROUP_SUMMARY)
+        if (sbn.isOngoing || (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)) {
+            return
+        }
+
         val selectedApps = AppUtils.getSelectedApps(this)
         if (selectedApps.contains(pkg)) {
             val appName = AppUtils.getAppName(this, pkg)
-
-            // Write the target into memory and set a validity period of 10 seconds 将目标写入内存，设置 10 秒有效期
             AppUtils.setAutoLaunchTarget(pkg, 10000L)
 
-            // Display bubble and send notification 发送气泡并弹出文字提示
-            updateMainBubble(appName)
+            // 【核心优化 2】：智能冷却判定
+            val currentTime = System.currentTimeMillis()
+            // 判断距离上一次弹窗是否已经过了冷却时间
+            val shouldAlert = (currentTime - lastAlertTime) > COOLDOWN_TIME_MS
+
+            // 如果允许弹窗，则重置冷却计时的起点
+            if (shouldAlert) {
+                lastAlertTime = currentTime
+            }
+
+            updateMainBubble(appName, shouldAlert)
         }
     }
 
-    private fun updateMainBubble(appName: String) {
+    // 接收 shouldAlert 参数，决定本次是强行弹出还是静默更新
+    private fun updateMainBubble(appName: String, shouldAlert: Boolean) {
         val channelId = AppUtils.BUBBLE_CHANNEL_ID
         val shortcutId = "bubble_split_shortcut"
 
@@ -41,7 +64,6 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setImportant(true)
             .build()
 
-        // Intent becomes completely pure and no longer takes any parameters, bypassing system cache bugs Intent 彻底变纯净，不再带任何参数，绕开系统缓存 Bug
         val targetIntent = Intent(this, BubbleActivity::class.java)
         val bubbleIntent = PendingIntent.getActivity(
             this, 0, targetIntent,
@@ -63,8 +85,7 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .build()
         ShortcutManagerCompat.pushDynamicShortcut(this, shortcut)
 
-        // Pop up prompt text
-        val msgText = getString(R.string.notif_dynamic_msg);
+        val msgText = getString(R.string.notif_dynamic_msg)
         val style = NotificationCompat.MessagingStyle(chatPartner)
             .addMessage("$msgText $appName", System.currentTimeMillis(), chatPartner)
 
@@ -81,8 +102,10 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setShortcutId(shortcutId)
             .addPerson(chatPartner)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            // Make sure a new text prompt pops up every time a notification comes 确保每次通知来时都能弹出新的文字提示
-            .setOnlyAlertOnce(false)
+            // 【点睛之笔】：配合冷却机制
+            // 如果 shouldAlert 为 true (不在冷却期)，这里设为 false，气泡会像平时一样直接弹在屏幕侧边
+            // 如果 shouldAlert 为 false (在 10 分钟冷却期内)，这里设为 true。此时它只会在下拉通知栏里悄悄更新文字内容，绝对不弹气泡打扰你，除非你自己拉下通知栏点击它！
+            .setOnlyAlertOnce(!shouldAlert)
 
         try {
             NotificationManagerCompat.from(this).notify(1001, builder.build())
