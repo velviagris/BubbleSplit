@@ -11,6 +11,7 @@ import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import android.os.Process
 
 class BubbleNotificationListenerService : NotificationListenerService() {
 
@@ -22,13 +23,17 @@ class BubbleNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        // 【核心修复】：工作分区/双开应用隔离
+        // 检查通知的所属用户，如果和当前运行 BubbleSplit 的用户不一致，直接忽略！
+        if (sbn.user != Process.myUserHandle()) {
+            return
+        }
+
         val pkg = sbn.packageName
         if (pkg == packageName) return
 
-        // 【核心优化 1】：拦截“幽灵”通知，解决电脑端处理后手机瞎弹气泡的问题
         val notification = sbn.notification
-        // 忽略常驻通知 (isOngoing，比如微信的“正在运行”)
-        // 忽略系统自动生成的群组折叠摘要 (FLAG_GROUP_SUMMARY)
+        // 忽略常驻通知或折叠摘要
         if (sbn.isOngoing || (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)) {
             return
         }
@@ -38,32 +43,48 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             val appName = AppUtils.getAppName(this, pkg)
             AppUtils.setAutoLaunchTarget(pkg, 10000L)
 
-            // 【核心优化 2】：智能冷却判定
             val currentTime = System.currentTimeMillis()
-            // 判断距离上一次弹窗是否已经过了冷却时间
             val shouldAlert = (currentTime - lastAlertTime) > COOLDOWN_TIME_MS
-
-            // 如果允许弹窗，则重置冷却计时的起点
             if (shouldAlert) {
                 lastAlertTime = currentTime
             }
 
-            updateMainBubble(appName, shouldAlert)
+            // ==================== 新增：提取并拦截 ====================
+            // 1. 提取原通知的内容和标题
+            val extras = notification.extras
+            val title = extras.getString(Notification.EXTRA_TITLE) ?: appName
+            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+
+            // 2. 提取原通知的点击跳转 Intent (这非常关键，它是应用原生的跳转逻辑)
+            val originalContentIntent = notification.contentIntent
+
+            // 3. 杀掉原装通知 (这就是“接管”的精髓)
+            cancelNotification(sbn.key)
+
+            // 4. 将提取到的所有素材，传给我们的克隆气泡
+            updateMainBubble(appName, title, text, originalContentIntent, shouldAlert)
         }
     }
 
-    // 接收 shouldAlert 参数，决定本次是强行弹出还是静默更新
-    private fun updateMainBubble(appName: String, shouldAlert: Boolean) {
+    // 增加接收提取到的原通知信息
+    private fun updateMainBubble(
+        appName: String,
+        title: String,
+        text: String,
+        originalContentIntent: PendingIntent?,
+        shouldAlert: Boolean
+    ) {
         val channelId = AppUtils.BUBBLE_CHANNEL_ID
         val shortcutId = "bubble_split_shortcut"
 
         val icon = IconCompat.createWithResource(this, R.drawable.ic_launcher_foreground)
         val chatPartner = Person.Builder()
-            .setName(getString(R.string.notif_partner_name))
+            .setName(appName) // 把发送人改成真实的应用名
             .setIcon(icon)
             .setImportant(true)
             .build()
 
+        // 气泡的跳转逻辑依然是我们自己的分屏控制台
         val targetIntent = Intent(this, BubbleActivity::class.java)
         val bubbleIntent = PendingIntent.getActivity(
             this, 0, targetIntent,
@@ -80,32 +101,36 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setCategories(setOf("android.shortcut.conversation"))
             .setIntent(shortcutIntent)
             .setLongLived(true)
-            .setShortLabel(getString(R.string.notif_partner_name))
+            .setShortLabel(appName)
             .setPerson(chatPartner)
             .build()
         ShortcutManagerCompat.pushDynamicShortcut(this, shortcut)
 
-        val msgText = getString(R.string.notif_dynamic_msg)
+        // ==================== 新增：完美克隆原通知的视觉 ====================
         val style = NotificationCompat.MessagingStyle(chatPartner)
-            .addMessage("$msgText $appName", System.currentTimeMillis(), chatPartner)
+            // 把提取出来的真实聊天内容放进去
+            .addMessage("$title: $text", System.currentTimeMillis(), chatPartner)
 
-        val contentIntent = PendingIntent.getActivity(
+        //  fallback: 如果原通知没有 contentIntent，才退回到打开我们的主页
+        val fallbackIntent = PendingIntent.getActivity(
             this, 1, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val finalContentIntent = originalContentIntent ?: fallbackIntent
 
         val builder = NotificationCompat.Builder(this, channelId)
-            .setContentIntent(contentIntent)
+            .setContentTitle(title) // 真实标题
+            .setContentText(text)   // 真实内容
+            // 【核心】：主通知体点击时，触发原装应用的跳转逻辑！
+            .setContentIntent(finalContentIntent)
             .setSmallIcon(R.drawable.ic_notification)
             .setStyle(style)
-            .setBubbleMetadata(bubbleData)
+            .setBubbleMetadata(bubbleData) // 依然保留气泡 metadata
             .setShortcutId(shortcutId)
             .addPerson(chatPartner)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            // 【点睛之笔】：配合冷却机制
-            // 如果 shouldAlert 为 true (不在冷却期)，这里设为 false，气泡会像平时一样直接弹在屏幕侧边
-            // 如果 shouldAlert 为 false (在 10 分钟冷却期内)，这里设为 true。此时它只会在下拉通知栏里悄悄更新文字内容，绝对不弹气泡打扰你，除非你自己拉下通知栏点击它！
             .setOnlyAlertOnce(!shouldAlert)
+            .setAutoCancel(true) // 点击后自动消失
 
         try {
             NotificationManagerCompat.from(this).notify(1001, builder.build())
