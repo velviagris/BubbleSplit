@@ -30,7 +30,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class BubbleActivity : ComponentActivity() {
 
@@ -169,45 +172,49 @@ class BubbleActivity : ComponentActivity() {
     }
 
     private fun launchAppInHalfScreen(packageName: String, isLandscape: Boolean) {
-        // Detect permissions and block foreground apps 检测权限并拦截前台应用
-        if (AppUtils.hasUsageStatsPermission(this)) {
-            if (AppUtils.isAppInForeground(this, packageName)) {
-                Toast.makeText(this, getString(R.string.toast_cannot_split), Toast.LENGTH_SHORT).show()
-                // Still perform the action of closing the bubble without blocking the user's view 依然执行收起气泡的动作，不挡用户视线
-                moveTaskToBack(true)
-                return
+        // 【核心修复】：在这里开启生命周期协程 launch
+        lifecycleScope.launch {
+
+            // 此时调用 suspend 检测方法，如果有冲突就退出协程
+            if (AppUtils.hasUsageStatsPermission(this@BubbleActivity)) {
+                if (AppUtils.isAppInForeground(this@BubbleActivity, packageName)) {
+                    Toast.makeText(this@BubbleActivity, getString(R.string.toast_cannot_split), Toast.LENGTH_SHORT).show()
+                    moveTaskToBack(true)
+                    return@launch // 现在这里绝对不会报 Unresolved label 了！
+                }
             }
-        }
 
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return@launch
 
-        launchIntent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT or
-                    Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-        )
+            launchIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT
+            )
 
-        val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
+            val displayMetrics = resources.displayMetrics
+            val screenWidth = displayMetrics.widthPixels
+            val screenHeight = displayMetrics.heightPixels
 
-        val bounds = if (isLandscape) {
-            Rect(0, 0, screenWidth / 2, screenHeight)
-        } else {
-            Rect(0, 0, screenWidth, screenHeight / 2)
-        }
+            val bounds = if (isLandscape) {
+                Rect(0, 0, screenWidth / 2, screenHeight)
+            } else {
+                Rect(0, 0, screenWidth, screenHeight / 2)
+            }
 
-        val options = ActivityOptions.makeBasic().setLaunchBounds(bounds)
+            val options = ActivityOptions.makeBasic().setLaunchBounds(bounds)
 
-        try {
-            startActivity(launchIntent, options.toBundle())
-            // Force the system to collapse the current bubble into a floating icon 强制系统将当前气泡折叠为悬浮图标
-            moveTaskToBack(true)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            startActivity(launchIntent)
-            // Don’t forget to collapse the bubble when downgrading starts 降级启动时也别忘了折叠气泡
-            moveTaskToBack(true)
+            try {
+                startActivity(launchIntent, options.toBundle())
+                moveTaskToBack(true)
+                // 【核心优化】：拉起成功后，清除通知栏的主通知 (ID: 1001)
+                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                startActivity(launchIntent)
+                moveTaskToBack(true)
+                // 【核心优化】：降级启动时，也清除通知栏主通知
+                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
+            }
         }
     }
 }
