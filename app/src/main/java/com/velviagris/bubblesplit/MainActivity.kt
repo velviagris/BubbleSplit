@@ -31,11 +31,17 @@ import com.velviagris.bubblesplit.ui.theme.BubbleSplitTheme
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val ACTION_SHOW_BUBBLE = "com.velviagris.bubblesplit.ACTION_SHOW_BUBBLE"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge()
         createNotificationChannel()
+
+        handleIntent(intent)
 
         setContent {
             BubbleSplitTheme {
@@ -88,6 +94,20 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    // 处理 Activity 处于后台时再次被启动的情况
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == ACTION_SHOW_BUBBLE) {
+            sendBubbleNotification()
+            // 如果你希望点击快捷方式唤醒气泡后，主界面自动收起/关闭，可以加上 finish()
+            // finish()
         }
     }
 

@@ -12,19 +12,14 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import android.os.Process
-// 【新增】：必须导入协程相关的包
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
+import androidx.core.graphics.drawable.toBitmap
 
 class BubbleNotificationListenerService : NotificationListenerService() {
-
-    companion object {
-        private var lastAlertTime = 0L
-        private const val COOLDOWN_TIME_MS = 10 * 60 * 1000L
-    }
 
     // 【新增】：为 Service 创建专属的协程作用域
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -51,45 +46,71 @@ class BubbleNotificationListenerService : NotificationListenerService() {
         val selectedApps = AppUtils.getSelectedApps(this)
         if (selectedApps.contains(pkg)) {
 
-            // 【核心修复】：在这里开启 launch，里面的 return@launch 就绝对不会报错了
             serviceScope.launch {
 
-                // 极速检测前台状态：如果是前台活跃应用，直接退出协程，不接管通知！
                 if (AppUtils.isAppInForeground(this@BubbleNotificationListenerService, pkg)) {
                     return@launch
                 }
 
-                val appName = AppUtils.getAppName(this@BubbleNotificationListenerService, pkg)
-                AppUtils.setAutoLaunchTarget(pkg, 10000L)
-
-                val currentTime = System.currentTimeMillis()
-                val shouldAlert = (currentTime - lastAlertTime) > COOLDOWN_TIME_MS
-                if (shouldAlert) {
-                    lastAlertTime = currentTime
+                val isTakeOver = AppUtils.isTakeOverNotifications(this@BubbleNotificationListenerService)
+                if (isTakeOver) {
+                    cancelNotification(sbn.key)
                 }
 
+                AppUtils.setAutoLaunchTarget(pkg, 10000L)
+
+                val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+                val activeNotif = nm.activeNotifications.find { it.id == 1001 }
+                val isShowing = activeNotif != null
+
+                // 【核心神迹】：判断当前气泡是否正悬浮在屏幕上
+                // Android 底层规定 FLAG_BUBBLE 的值为 0x00001000 (即 4096)
+                val isCurrentlyBubbling = activeNotif?.let {
+                    (it.notification.flags and Notification.FLAG_BUBBLE) != 0
+                } ?: false
+
+                if (isShowing && !isCurrentlyBubbling) {
+                    // 情况 A：气泡被用户拖到 X 关闭了（但通知还在下拉栏）
+                    // 此时绝对不去调用 notify，彻底防止气泡死灰复燃糊脸！
+                    return@launch
+                }
+
+                // 情况 B：要么是完全没通知 (首次弹出)，要么是气泡正悬浮在屏幕上 (更新气泡)
+                val appName = AppUtils.getAppName(this@BubbleNotificationListenerService, pkg)
                 val extras = notification.extras
                 val title = extras.getString(Notification.EXTRA_TITLE) ?: appName
                 val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
                 val originalContentIntent = notification.contentIntent
 
-                cancelNotification(sbn.key)
-                updateMainBubble(appName, title, text, originalContentIntent, shouldAlert)
+                // 把 isShowing 传过去，用来控制是否需要发声
+                updateMainBubble(pkg, appName, title, text, originalContentIntent, isShowing)
             }
         }
     }
 
     private fun updateMainBubble(
+        pkg: String,
         appName: String,
         title: String,
         text: String,
         originalContentIntent: PendingIntent?,
-        shouldAlert: Boolean
+        isUpdate: Boolean
     ) {
         val channelId = AppUtils.BUBBLE_CHANNEL_ID
         val shortcutId = "bubble_split_shortcut"
 
-        val icon = IconCompat.createWithResource(this, R.drawable.ic_launcher_foreground)
+        val appIconDrawable = try {
+            packageManager.getApplicationIcon(pkg)
+        } catch (e: Exception) {
+            // 容错：如果获取失败，退回到我们的默认图标
+            androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_launcher_foreground)!!
+        }
+
+        // 将 Drawable 转换成 144x144 的 Bitmap (固定尺寸防止某些矢量图转换崩溃)
+        val iconBitmap = appIconDrawable.toBitmap(144, 144)
+        // 使用 Bitmap 创建 IconCompat，供气泡和通知使用
+        val icon = IconCompat.createWithBitmap(iconBitmap)
+
         val chatPartner = Person.Builder()
             .setName(appName)
             .setIcon(icon)
@@ -113,6 +134,7 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setIntent(shortcutIntent)
             .setLongLived(true)
             .setShortLabel(appName)
+            .setIcon(icon)
             .setPerson(chatPartner)
             .build()
         ShortcutManagerCompat.pushDynamicShortcut(this, shortcut)
@@ -136,7 +158,7 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setShortcutId(shortcutId)
             .addPerson(chatPartner)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setOnlyAlertOnce(!shouldAlert)
+            .setOnlyAlertOnce(isUpdate)
             .setAutoCancel(true)
 
         try {

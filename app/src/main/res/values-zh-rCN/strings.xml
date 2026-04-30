@@ -33,4 +33,9 @@
     <string name="notif_dynamic_msg">点击打开</string>
     <string name="bubble_empty_state">尚未选择应用。\n请在主应用设置中添加。</string>
     <string name="toast_cannot_split">该应用已在全屏运行，无法分屏拉起</string>
+
+    <string name="setting_take_over_title">接管应用通知</string>
+    <string name="setting_take_over_desc">开启后将原通知替换为气泡，关闭则两者同时显示</string>
+
+    <string name="shortcut_show_bubble">显示气泡</string>
 </resources>

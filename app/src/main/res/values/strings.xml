@@ -33,4 +33,8 @@
     <string name="bubble_empty_state">No apps selected.\nPlease add them in the main app settings.</string>
     <string name="toast_cannot_split">Cannot open in split-screen while running in full screen.</string>
 
+    <string name="setting_take_over_title">Take Over Notifications</string>
+    <string name="setting_take_over_desc">Replace original notifications with bubbles when enabled; show both when disabled.</string>
+
+    <string name="shortcut_show_bubble">Show Bubble</string>
 </resources>

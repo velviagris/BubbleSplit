@@ -33,6 +33,7 @@ fun SettingsScreen(onNavigateToSelector: () -> Unit, onSendNotification: () -> U
     var selectedCount by remember { mutableStateOf(0) }
     var hasListenerPermission by remember { mutableStateOf(false) }
     var hasUsagePermission by remember { mutableStateOf(false) }
+    var isTakeOver by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -46,6 +47,7 @@ fun SettingsScreen(onNavigateToSelector: () -> Unit, onSendNotification: () -> U
                     val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
                     hasListenerPermission = enabledListeners.contains(context.packageName)
                     hasUsagePermission = AppUtils.hasUsageStatsPermission(context)
+                    isTakeOver = AppUtils.isTakeOverNotifications(context)
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
@@ -110,6 +112,16 @@ fun SettingsScreen(onNavigateToSelector: () -> Unit, onSendNotification: () -> U
             }
         )
 
+        SettingSwitchCard(
+            title = stringResource(R.string.setting_take_over_title),
+            subtitle = stringResource(R.string.setting_take_over_desc),
+            checked = isTakeOver,
+            onCheckedChange = {
+                isTakeOver = it
+                AppUtils.setTakeOverNotifications(context, it)
+            }
+        )
+
         SettingCard(
             title = stringResource(R.string.setting_apps_title),
             subtitle = if (selectedCount > 0) stringResource(id = R.string.setting_apps_count, selectedCount) else stringResource(R.string.setting_apps_empty),
@@ -137,6 +149,30 @@ fun SettingCard(title: String, subtitle: String, subtitleColor: Color = Material
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = "Enter",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun SettingSwitchCard(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onCheckedChange(!checked) } // 点击整个卡片也能切换开关
+    ) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            headlineContent = { Text(title, fontWeight = FontWeight.SemiBold) },
+            supportingContent = { Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            trailingContent = {
+                Switch(
+                    checked = checked,
+                    onCheckedChange = null // null 代表点击事件已由外层 Card 接管
                 )
             }
         )

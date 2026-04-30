@@ -206,14 +206,14 @@ class BubbleActivity : ComponentActivity() {
             try {
                 startActivity(launchIntent, options.toBundle())
                 moveTaskToBack(true)
-                // 【核心优化】：拉起成功后，清除通知栏的主通知 (ID: 1001)
-                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
+//                // 【核心优化】：拉起成功后，清除通知栏的主通知 (ID: 1001)
+//                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
             } catch (e: Exception) {
                 e.printStackTrace()
                 startActivity(launchIntent)
                 moveTaskToBack(true)
-                // 【核心优化】：降级启动时，也清除通知栏主通知
-                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
+//                // 【核心优化】：降级启动时，也清除通知栏主通知
+//                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
             }
         }
     }

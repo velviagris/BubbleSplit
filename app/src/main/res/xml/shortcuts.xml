@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="show_bubble_shortcut"
+        android:enabled="true"
+        android:icon="@drawable/ic_notification"
+        android:shortcutShortLabel="@string/shortcut_show_bubble"
+        android:shortcutLongLabel="@string/shortcut_show_bubble">
+        <intent
+            android:action="com.velviagris.bubblesplit.ACTION_SHOW_BUBBLE"
+            android:targetPackage="com.velviagris.bubblesplit"
+            android:targetClass="com.velviagris.bubblesplit.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>

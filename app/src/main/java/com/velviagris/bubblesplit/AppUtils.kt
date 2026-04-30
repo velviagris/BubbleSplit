@@ -24,6 +24,7 @@ object AppUtils {
     const val BUBBLE_CHANNEL_ID = "bubble_popup_silent_v1"
     private const val PREFS_NAME = "bubble_prefs"
     private const val KEY_SELECTED_APPS = "selected_apps"
+    private const val KEY_TAKE_OVER_NOTIFICATIONS = "take_over_notifications"
 
     // Timeliness-based bubble status management 基于时效性的气泡状态管理
     private var pendingTargetPkg: String? = null
@@ -181,5 +182,17 @@ object AppUtils {
         val realForegroundApp = if (currentApp == context.packageName) previousApp else currentApp
 
         return realForegroundApp == targetPackage
+    }
+
+    // 读取“是否接管通知”状态，默认返回 false (不接管)
+    fun isTakeOverNotifications(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_TAKE_OVER_NOTIFICATIONS, false)
+    }
+
+    // 保存“是否接管通知”状态
+    fun setTakeOverNotifications(context: Context, takeOver: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_TAKE_OVER_NOTIFICATIONS, takeOver).apply()
     }
 }
