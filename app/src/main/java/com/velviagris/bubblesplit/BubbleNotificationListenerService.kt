@@ -12,19 +12,23 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import android.os.Process
+import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
-import androidx.core.graphics.drawable.toBitmap
 
 class BubbleNotificationListenerService : NotificationListenerService() {
 
-    // 【新增】：为 Service 创建专属的协程作用域
+    companion object {
+        // 只需记录对话时间，无需任何复杂的拦截屏蔽
+        private var lastMessageTime = 0L
+        private const val COOLDOWN_TIME_MS = 10 * 60 * 1000L // 10分钟
+    }
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    // 【新增】：服务销毁时清理协程，防止内存泄漏
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
@@ -45,13 +49,13 @@ class BubbleNotificationListenerService : NotificationListenerService() {
 
         val selectedApps = AppUtils.getSelectedApps(this)
         if (selectedApps.contains(pkg)) {
-
             serviceScope.launch {
 
                 if (AppUtils.isAppInForeground(this@BubbleNotificationListenerService, pkg)) {
                     return@launch
                 }
 
+                // 核心：接管原通知（秒杀系统的原生通知）
                 val isTakeOver = AppUtils.isTakeOverNotifications(this@BubbleNotificationListenerService)
                 if (isTakeOver) {
                     cancelNotification(sbn.key)
@@ -59,31 +63,23 @@ class BubbleNotificationListenerService : NotificationListenerService() {
 
                 AppUtils.setAutoLaunchTarget(pkg, 10000L)
 
-                val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
-                val activeNotif = nm.activeNotifications.find { it.id == 1001 }
-                val isShowing = activeNotif != null
+                val currentTime = System.currentTimeMillis()
+                val isFreshStart = (currentTime - lastMessageTime) > COOLDOWN_TIME_MS
+                lastMessageTime = currentTime
 
-                // 【核心神迹】：判断当前气泡是否正悬浮在屏幕上
-                // Android 底层规定 FLAG_BUBBLE 的值为 0x00001000 (即 4096)
-                val isCurrentlyBubbling = activeNotif?.let {
-                    (it.notification.flags and Notification.FLAG_BUBBLE) != 0
-                } ?: false
+                // 去除所有死气泡拦截！只要有消息，永远构建并发送咱们的 1001 通知。
+                // 如果是冷却期内的消息 (isUpdate = true)，它会静默更新到通知栏。
+                val isUpdate = !isFreshStart
 
-                if (isShowing && !isCurrentlyBubbling) {
-                    // 情况 A：气泡被用户拖到 X 关闭了（但通知还在下拉栏）
-                    // 此时绝对不去调用 notify，彻底防止气泡死灰复燃糊脸！
-                    return@launch
-                }
-
-                // 情况 B：要么是完全没通知 (首次弹出)，要么是气泡正悬浮在屏幕上 (更新气泡)
                 val appName = AppUtils.getAppName(this@BubbleNotificationListenerService, pkg)
                 val extras = notification.extras
                 val title = extras.getString(Notification.EXTRA_TITLE) ?: appName
                 val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+
+                // 提取原应用的跳转意图
                 val originalContentIntent = notification.contentIntent
 
-                // 把 isShowing 传过去，用来控制是否需要发声
-                updateMainBubble(pkg, appName, title, text, originalContentIntent, isShowing)
+                updateMainBubble(pkg, appName, title, text, originalContentIntent, isUpdate)
             }
         }
     }
@@ -102,13 +98,9 @@ class BubbleNotificationListenerService : NotificationListenerService() {
         val appIconDrawable = try {
             packageManager.getApplicationIcon(pkg)
         } catch (e: Exception) {
-            // 容错：如果获取失败，退回到我们的默认图标
             androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_launcher_foreground)!!
         }
-
-        // 将 Drawable 转换成 144x144 的 Bitmap (固定尺寸防止某些矢量图转换崩溃)
         val iconBitmap = appIconDrawable.toBitmap(144, 144)
-        // 使用 Bitmap 创建 IconCompat，供气泡和通知使用
         val icon = IconCompat.createWithBitmap(iconBitmap)
 
         val chatPartner = Person.Builder()
@@ -117,6 +109,8 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setImportant(true)
             .build()
 
+        // ==================== 意图分流 1：气泡行为 ====================
+        // 绑给气泡的 Intent：拉起我们自己的 BubbleActivity (分屏控制台)
         val targetIntent = Intent(this, BubbleActivity::class.java)
         val bubbleIntent = PendingIntent.getActivity(
             this, 0, targetIntent,
@@ -125,8 +119,9 @@ class BubbleNotificationListenerService : NotificationListenerService() {
 
         val bubbleData = NotificationCompat.BubbleMetadata.Builder(bubbleIntent, icon)
             .setDesiredHeight(600)
-            .setAutoExpandBubble(false)
+            .setAutoExpandBubble(false) // 默认不强行弹脸，遵循系统习惯
             .build()
+        // ==============================================================
 
         val shortcutIntent = Intent(this, MainActivity::class.java).apply { action = Intent.ACTION_MAIN }
         val shortcut = ShortcutInfoCompat.Builder(this, shortcutId)
@@ -142,24 +137,27 @@ class BubbleNotificationListenerService : NotificationListenerService() {
         val style = NotificationCompat.MessagingStyle(chatPartner)
             .addMessage("$title: $text", System.currentTimeMillis(), chatPartner)
 
+        // ==================== 意图分流 2：主体行为 ====================
+        // 绑给通知主体的 Intent：优先使用原应用的跳转逻辑
         val fallbackIntent = PendingIntent.getActivity(
             this, 1, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val finalContentIntent = originalContentIntent ?: fallbackIntent
+        // ==============================================================
 
         val builder = NotificationCompat.Builder(this, channelId)
             .setContentTitle(title)
             .setContentText(text)
-            .setContentIntent(finalContentIntent)
+            .setContentIntent(finalContentIntent) // 【核心绑定】：点击文字卡片主体 -> 全屏进入微信
             .setSmallIcon(R.drawable.ic_notification)
             .setStyle(style)
-            .setBubbleMetadata(bubbleData)
+            .setBubbleMetadata(bubbleData)        // 【核心绑定】：点击右下角气泡图标 -> 展开分屏控制台
             .setShortcutId(shortcutId)
             .addPerson(chatPartner)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setOnlyAlertOnce(isUpdate)
-            .setAutoCancel(true)
+            .setOnlyAlertOnce(isUpdate) // 短时间内收到多条消息，只在通知栏安静更新文本，不反复叮咚
+            .setAutoCancel(true)        // 点击通知主体后，自动清除通知卡片
 
         try {
             NotificationManagerCompat.from(this).notify(1001, builder.build())
