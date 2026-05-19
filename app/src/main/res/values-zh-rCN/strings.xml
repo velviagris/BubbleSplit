@@ -1,41 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <string name="app_name">Bubble Split</string>
 
-    <string name="tab_settings">设置</string>
-    <string name="tab_about">关于</string>
+    <string name="tab_settings">&#x8BBE;&#x7F6E;</string>
+    <string name="tab_about">&#x5173;&#x4E8E;</string>
 
-    <string name="setting_permission_title">授权读取应用通知</string>
-    <string name="setting_permission_granted">已授权，将自动生成气泡</string>
-    <string name="setting_permission_denied">未授权，点击开启权限</string>
-    <string name="setting_bubble_title">开启主控台气泡</string>
-    <string name="setting_bubble_desc">发送常驻通知，随时呼出气泡</string>
-    <string name="setting_prevent_dupsplit">授权防止重复拉起 (推荐)</string>
-    <string name="setting_usage_title">授权防止重复拉起 (推荐)</string>
-    <string name="setting_usage_granted">已授权，将自动拦截前台应用</string>
-    <string name="setting_usage_denied">未授权，分屏拉起全屏应用可能会报错</string>
-    <string name="setting_apps_title">常用应用管理</string>
-    <string name="setting_apps_count">已选择 %1$d 个分屏应用</string>
-    <string name="setting_apps_empty">未选择任何应用，点击添加</string>
+    <string name="setting_permission_title">&#x6388;&#x6743;&#x8BFB;&#x53D6;&#x5E94;&#x7528;&#x901A;&#x77E5;</string>
+    <string name="setting_permission_granted">&#x5DF2;&#x6388;&#x6743;&#xFF0C;&#x5C06;&#x81EA;&#x52A8;&#x751F;&#x6210;&#x6C14;&#x6CE1;</string>
+    <string name="setting_permission_denied">&#x672A;&#x6388;&#x6743;&#xFF0C;&#x70B9;&#x51FB;&#x5F00;&#x542F;&#x6743;&#x9650;</string>
+    <string name="setting_bubble_title">&#x5F00;&#x542F;&#x4E3B;&#x63A7;&#x53F0;&#x6C14;&#x6CE1;</string>
+    <string name="setting_bubble_desc">&#x53D1;&#x9001;&#x5E38;&#x9A7B;&#x901A;&#x77E5;&#xFF0C;&#x968F;&#x65F6;&#x547C;&#x51FA;&#x6C14;&#x6CE1;</string>
+    <string name="setting_prevent_dupsplit">&#x6388;&#x6743;&#x9632;&#x6B62;&#x91CD;&#x590D;&#x62C9;&#x8D77; (&#x63A8;&#x8350;)</string>
+    <string name="setting_usage_title">&#x6388;&#x6743;&#x9632;&#x6B62;&#x91CD;&#x590D;&#x62C9;&#x8D77; (&#x63A8;&#x8350;)</string>
+    <string name="setting_usage_granted">&#x5DF2;&#x6388;&#x6743;&#xFF0C;&#x5C06;&#x81EA;&#x52A8;&#x62E6;&#x622A;&#x524D;&#x53F0;&#x5E94;&#x7528;</string>
+    <string name="setting_usage_denied">&#x672A;&#x6388;&#x6743;&#xFF0C;&#x5206;&#x5C4F;&#x62C9;&#x8D77;&#x5168;&#x5C4F;&#x5E94;&#x7528;&#x53EF;&#x80FD;&#x4F1A;&#x62A5;&#x9519;</string>
+    <string name="setting_apps_title">&#x5E38;&#x7528;&#x5E94;&#x7528;&#x7BA1;&#x7406;</string>
+    <string name="setting_apps_count">&#x5DF2;&#x9009;&#x62E9; %1$d &#x4E2A;&#x5206;&#x5C4F;&#x5E94;&#x7528;</string>
+    <string name="setting_apps_empty">&#x672A;&#x9009;&#x62E9;&#x4EFB;&#x4F55;&#x5E94;&#x7528;&#xFF0C;&#x70B9;&#x51FB;&#x6DFB;&#x52A0;</string>
 
-    <string name="selector_title">订阅应用</string>
-    <string name="selector_done">完成</string>
-    <string name="selector_back">返回</string>
+    <string name="selector_title">&#x8BA2;&#x9605;&#x5E94;&#x7528;</string>
+    <string name="selector_done">&#x5B8C;&#x6210;</string>
+    <string name="selector_back">&#x8FD4;&#x56DE;</string>
 
-    <string name="about_title">关于</string>
+    <string name="about_title">&#x5173;&#x4E8E;</string>
     <string name="about_version">1.0.0</string>
-    <string name="about_developer">开发者：Grace Chan</string>
-    <string name="about_project_url">项目地址：</string>
+    <string name="about_developer">&#x5F00;&#x53D1;&#x8005;&#xFF1A;Grace Chan</string>
+    <string name="about_project_url">&#x9879;&#x76EE;&#x5730;&#x5740;&#xFF1A;</string>
 
     <string name="notif_channel_name">Bubble Notifications</string>
-    <string name="notif_partner_name">应用中心</string>
-    <string name="notif_main_msg">点击右下角的小气泡图标，呼出分屏控制台！</string>
-    <string name="notif_dynamic_msg">点击打开</string>
-    <string name="bubble_empty_state">尚未选择应用。\n请在主应用设置中添加。</string>
-    <string name="toast_cannot_split">该应用已在全屏运行，无法分屏拉起</string>
+    <string name="notification_listener_label">BubbleSplit &#x901A;&#x77E5;&#x76D1;&#x542C;</string>
+    <string name="notif_partner_name">&#x5E94;&#x7528;&#x4E2D;&#x5FC3;</string>
+    <string name="notif_main_msg">&#x70B9;&#x51FB;&#x53F3;&#x4E0B;&#x89D2;&#x7684;&#x5C0F;&#x6C14;&#x6CE1;&#x56FE;&#x6807;&#xFF0C;&#x547C;&#x51FA;&#x5206;&#x5C4F;&#x63A7;&#x5236;&#x53F0;&#xFF01;</string>
+    <string name="notif_dynamic_msg">&#x70B9;&#x51FB;&#x6253;&#x5F00;</string>
+    <string name="bubble_empty_state">&#x5C1A;&#x672A;&#x9009;&#x62E9;&#x5E94;&#x7528;&#x3002;\n&#x8BF7;&#x5728;&#x4E3B;&#x5E94;&#x7528;&#x8BBE;&#x7F6E;&#x4E2D;&#x6DFB;&#x52A0;&#x3002;</string>
+    <string name="toast_cannot_split">&#x8BE5;&#x5E94;&#x7528;&#x5DF2;&#x5728;&#x5168;&#x5C4F;&#x8FD0;&#x884C;&#xFF0C;&#x65E0;&#x6CD5;&#x5206;&#x5C4F;&#x62C9;&#x8D77;</string>
 
-    <string name="setting_take_over_title">接管应用通知</string>
-    <string name="setting_take_over_desc">开启后将原通知替换为气泡，关闭则两者同时显示</string>
+    <string name="setting_take_over_title">&#x63A5;&#x7BA1;&#x5E94;&#x7528;&#x901A;&#x77E5;</string>
+    <string name="setting_take_over_desc">&#x5F00;&#x542F;&#x540E;&#x5C06;&#x539F;&#x901A;&#x77E5;&#x66FF;&#x6362;&#x4E3A;&#x6C14;&#x6CE1;&#xFF0C;&#x5173;&#x95ED;&#x5219;&#x4E24;&#x8005;&#x540C;&#x65F6;&#x663E;&#x793A;</string>
+    <string name="setting_bubble_snooze_title">&#x5F00;&#x542F;&#x6C14;&#x6CE1;&#x52FF;&#x6270;</string>
+    <string name="setting_bubble_snooze_desc">&#x6C14;&#x6CE1;&#x79FB;&#x9664;&#x540E;&#xFF0C;10min&#x5185;&#x4E0D;&#x4F1A;&#x518D;&#x5F39;&#x51FA; (&#x82E5;&#x5F00;&#x542F;&#x63A5;&#x7BA1;&#x5E94;&#x7528;&#x901A;&#x77E5;&#xFF0C;&#x6B64;&#x65F6;&#x4F1A;&#x663E;&#x793A;&#x539F;&#x901A;&#x77E5;)</string>
 
-    <string name="shortcut_show_bubble">显示气泡</string>
+    <string name="shortcut_show_bubble">&#x663E;&#x793A;&#x6C14;&#x6CE1;</string>
 </resources>

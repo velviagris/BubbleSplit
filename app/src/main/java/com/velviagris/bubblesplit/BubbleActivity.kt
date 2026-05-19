@@ -28,16 +28,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.core.app.NotificationManagerCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import com.velviagris.bubblesplit.model.AppItem
+import com.velviagris.bubblesplit.util.AppUtils
 import kotlinx.coroutines.launch
 
 class BubbleActivity : ComponentActivity() {
 
-    // Use StateFlow to monitor the pull-up action 用 StateFlow 监听拉起动作
+    // 监听自动拉起目标 / Use StateFlow to observe the auto-launch target.
     private val autoLaunchTargetFlow = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,12 +52,12 @@ class BubbleActivity : ComponentActivity() {
                     val config = LocalConfiguration.current
                     val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-                    // If there is a target package name, split the screen immediately. 监听如果有目标包名，立刻分屏
+                    // 有目标包名时立即分屏 / Launch split screen as soon as a target package appears.
                     val targetToLaunch by autoLaunchTargetFlow.collectAsState()
                     LaunchedEffect(targetToLaunch) {
                         if (targetToLaunch != null) {
                             launchAppInHalfScreen(targetToLaunch!!, isLandscape)
-                            // Reset the bubble status immediately after split screen is completed 分屏完毕立刻重置状态
+                            // 分屏后重置状态 / Reset state after split-screen launch.
                             autoLaunchTargetFlow.value = null
                         }
                     }
@@ -69,7 +68,7 @@ class BubbleActivity : ComponentActivity() {
         }
     }
 
-    // Triggered when the bubble has been in the background and is clicked again to open 当气泡一直在后台，被再次点击打开时触发
+    // 气泡后台再次打开 / Called when the background bubble is opened again.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         checkAndConsumeAutoLaunch()
@@ -80,10 +79,9 @@ class BubbleActivity : ComponentActivity() {
         checkAndConsumeAutoLaunch()
     }
 
-    // Main check logic 核心检查逻辑
+    // 核心检查逻辑 / Main auto-launch check.
     private fun checkAndConsumeAutoLaunch() {
-        // Reading from memory: If 10 seconds have passed or it has been read, null will be returned here.
-        // 去内存中读取：如果过了 10 秒或者已经被读取过了，这里就会返回 null
+        // 读取一次性目标，过期或已消费则为空 / Consume the one-shot target; expired or consumed targets return null.
         val target = AppUtils.consumeAutoLaunchTarget()
         if (target != null) {
             autoLaunchTargetFlow.value = target
@@ -98,10 +96,10 @@ class BubbleActivity : ComponentActivity() {
         val context = LocalContext.current
         val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-        // Add a refresh trigger 增加一个刷新触发器
+        // 刷新触发器 / Refresh trigger for app list reloads.
         var refreshTrigger by remember { mutableStateOf(0) }
 
-        // Listen for bubble expansion (ON_RESUME) and let the trigger +1 whenever it expands 监听气泡展开 (ON_RESUME)，只要展开就让触发器 +1
+        // 监听气泡展开 / Increment the trigger whenever the bubble resumes.
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
@@ -114,8 +112,7 @@ class BubbleActivity : ComponentActivity() {
             }
         }
 
-        // Whenever the trigger changes (i.e. every time the bubble comes back to the foreground), the latest data is re-read and filtered
-        // 只要触发器变化（也就是每次气泡回到前台），就重新读取并过滤最新数据
+        // 回到前台时刷新应用列表 / Reload selected apps whenever the bubble returns to foreground.
         LaunchedEffect(refreshTrigger) {
             isLoading = true
             val selectedPackages = AppUtils.getSelectedApps(context)
@@ -172,15 +169,15 @@ class BubbleActivity : ComponentActivity() {
     }
 
     private fun launchAppInHalfScreen(packageName: String, isLandscape: Boolean) {
-        // 【核心修复】：在这里开启生命周期协程 launch
+        // 使用生命周期协程 / Launch work in the Activity lifecycle scope.
         lifecycleScope.launch {
 
-            // 此时调用 suspend 检测方法，如果有冲突就退出协程
+            // 前台冲突时退出 / Abort if the target app is already foreground.
             if (AppUtils.hasUsageStatsPermission(this@BubbleActivity)) {
                 if (AppUtils.isAppInForeground(this@BubbleActivity, packageName)) {
                     Toast.makeText(this@BubbleActivity, getString(R.string.toast_cannot_split), Toast.LENGTH_SHORT).show()
                     moveTaskToBack(true)
-                    return@launch // 现在这里绝对不会报 Unresolved label 了！
+                    return@launch
                 }
             }
 
@@ -206,14 +203,10 @@ class BubbleActivity : ComponentActivity() {
             try {
                 startActivity(launchIntent, options.toBundle())
                 moveTaskToBack(true)
-//                // 【核心优化】：拉起成功后，清除通知栏的主通知 (ID: 1001)
-//                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
             } catch (e: Exception) {
                 e.printStackTrace()
                 startActivity(launchIntent)
                 moveTaskToBack(true)
-//                // 【核心优化】：降级启动时，也清除通知栏主通知
-//                NotificationManagerCompat.from(this@BubbleActivity).cancel(1001)
             }
         }
     }

@@ -1,4 +1,4 @@
-package com.velviagris.bubblesplit
+package com.velviagris.bubblesplit.ui.screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.velviagris.bubblesplit.R
 import com.velviagris.bubblesplit.ui.theme.BubbleSplitTheme
 
 @Composable

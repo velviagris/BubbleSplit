@@ -1,4 +1,4 @@
-package com.velviagris.bubblesplit
+package com.velviagris.bubblesplit.util
 
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
@@ -6,48 +6,39 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.core.graphics.drawable.toBitmap
 import android.os.Process
 import androidx.core.content.edit
-
-// app data model
-data class AppItem(
-    val name: String,
-    val packageName: String,
-    val icon: Drawable
-)
+import com.velviagris.bubblesplit.model.AppItem
 
 object AppUtils {
-    // Globally unique silent bubble channel ID 全局唯一的静音气泡通道 ID
+    // 全局静音气泡通道 ID / Globally unique silent bubble channel ID.
     const val BUBBLE_CHANNEL_ID = "bubble_popup_silent_v1"
     private const val PREFS_NAME = "bubble_prefs"
     private const val KEY_SELECTED_APPS = "selected_apps"
     private const val KEY_TAKE_OVER_NOTIFICATIONS = "take_over_notifications"
     private const val KEY_BUBBLE_SNOOZE_UNTIL = "bubble_snooze_until"
+    private const val KEY_BUBBLE_SNOOZE_ENABLED = "bubble_snooze_enabled"
 
-    // Timeliness-based bubble status management 基于时效性的气泡状态管理
+    // 临时拉起目标状态 / Time-limited auto-launch target state.
     private var pendingTargetPkg: String? = null
     private var targetExpiryTime: Long = 0L
 
-    // Read the saved application package name collection 读取已保存的应用包名集合
+    // 读取已选应用包名 / Read saved selected package names.
     fun getSelectedApps(context: Context): Set<String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getStringSet(KEY_SELECTED_APPS, emptySet()) ?: emptySet()
     }
 
-    // Save the collection of application package names selected by the user 保存用户选中的应用包名集合
+    // 保存已选应用包名 / Save package names selected by the user.
     fun saveSelectedApps(context: Context, packages: Set<String>) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putStringSet(KEY_SELECTED_APPS, packages).apply()
     }
 
-    /*
-    * Asynchronously obtain all applications in the device that can be launched through the Launcher
-    * 异步获取设备内所有可通过 Launcher 启动的应用
-    * */
+    // 异步加载桌面可启动应用 / Asynchronously load launcher apps.
     suspend fun loadInstalledApps(context: Context): List<AppItem> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN, null).apply {
@@ -64,10 +55,7 @@ object AppUtils {
         }.sortedBy { it.name }
     }
 
-    /*
-    * 根据包名获取应用名称
-    * Get application name based on package name
-    * */
+    // 按包名获取应用名称 / Get app name by package name.
     fun getAppName(context: Context, packageName: String): String {
         val pm = context.packageManager
         return try {
@@ -78,10 +66,7 @@ object AppUtils {
         }
     }
 
-    /*
-    * Get the application icon based on the package name and convert it to a Bitmap
-    * 根据包名获取应用图标并转换为 Bitmap
-    * */
+    // 按包名获取应用图标 Bitmap / Get app icon bitmap by package name.
     fun getAppIconBitmap(context: Context, packageName: String): android.graphics.Bitmap? {
         val pm = context.packageManager
         return try {
@@ -94,17 +79,17 @@ object AppUtils {
 
     fun setAutoLaunchTarget(pkg: String, validDurationMs: Long = 10000L) {
         pendingTargetPkg = pkg
-        // Record expiration time (current time + 10 seconds) 记录过期时间（当前时间 + 10秒）
+        // 记录过期时间 / Record the expiry timestamp.
         targetExpiryTime = System.currentTimeMillis() + validDurationMs
     }
 
     fun consumeAutoLaunchTarget(): String? {
         val current = System.currentTimeMillis()
         val target = pendingTargetPkg
-        // No matter whether it is expired or not, it will be cleared immediately after being read once (it will be destroyed after reading) 无论是否过期，只要读取一次就立刻清空（阅后即焚）
+        // 读取后立即清空 / Clear the one-shot target immediately after reading.
         pendingTargetPkg = null
 
-        // If there is a target package name and the current time is still within the validity period, the package name will be returned. 检查：如果有目标包名，并且当前时间还在有效期内，才返回包名
+        // 仅返回未过期目标 / Return the target only while it is still valid.
         return if (target != null && current <= targetExpiryTime) {
             target
         } else {
@@ -112,17 +97,14 @@ object AppUtils {
         }
     }
 
-    /*
-    * Load selected apps
-    * 极速按需加载选中的应用
-    * */
+    // 加载已选应用 / Load only selected apps.
     suspend fun loadSelectedAppsOnly(context: Context, packageNames: Set<String>): List<AppItem> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val result = mutableListOf<AppItem>()
 
         for (pkg in packageNames) {
             try {
-                // Directly and accurately obtain the information of the specified package name, ignoring hundreds of other useless applications 直接精准获取指定包名的信息，忽略其余几百个无用应用
+                // 精准读取指定包名 / Read only the requested package info.
                 val info = pm.getApplicationInfo(pkg, 0)
                 result.add(
                     AppItem(
@@ -132,15 +114,15 @@ object AppUtils {
                     )
                 )
             } catch (e: PackageManager.NameNotFoundException) {
-                // If the user uninstalls the App from the system but it still exists in our records, an exception will be thrown and we will ignore it directly. 如果用户在系统里卸载了这个 App，但我们的记录里还有，就会抛出异常，我们直接忽略它
+                // 忽略已卸载应用 / Ignore packages that no longer exist.
                 e.printStackTrace()
             }
         }
-        // Return in alphabetical order 按首字母排序返回
+        // 按名称排序 / Return sorted by app name.
         result.sortedBy { it.name }
     }
 
-    // Check if you have the "View app usage" permission 检查是否拥有“查看应用使用情况”的权限
+    // 检查使用情况权限 / Check the "View app usage" permission.
     fun hasUsageStatsPermission(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val mode = appOps.checkOpNoThrow(
@@ -151,14 +133,12 @@ object AppUtils {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
-    // Check whether the target application is the real foreground application currently (or before being covered by the bubble) 检查目标应用是否是当前（或被气泡覆盖前）的真实前台应用
+    // 检查真实前台应用 / Check whether the target app is the real foreground app.
     fun isAppInForeground(context: Context, targetPackage: String): Boolean {
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val endTime = System.currentTimeMillis()
 
-        // Extend detection time
-        // 将时间窗口大幅拉长到 2 小时 (1000L * 60 * 60 * 2)
-        // 这样即使你在微信聊天页停留发呆了 1 个小时再点气泡，系统也能精准翻出 1 小时前微信进入前台的记录
+        // 拉长检测窗口到 2 小时 / Extend the detection window to 2 hours.
         val startTime = endTime - 1000L * 60 * 60 * 2
 
         val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
@@ -167,13 +147,12 @@ object AppUtils {
         var currentApp: String? = null
         var previousApp: String? = null
 
-        // 精准追踪应用切换“轨迹栈”
+        // 追踪应用切换轨迹 / Track the package switch trail.
         while (usageEvents.hasNextEvent()) {
             usageEvents.getNextEvent(event)
-            // ACTIVITY_RESUMED 代表有页面进入了前台
+            // 页面进入前台 / ACTIVITY_RESUMED means an activity moved foreground.
             if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                // 只有当“包名真的变了”时，才更新轨迹。
-                // 这一步完美折叠了微信内部（主页 -> 聊天页 -> 朋友圈）的多次自我跳转，始终把它视为同一个 App
+                // 仅在包名变化时更新 / Update only when the package actually changes.
                 if (currentApp != event.packageName) {
                     previousApp = currentApp
                     currentApp = event.packageName
@@ -186,16 +165,26 @@ object AppUtils {
         return realForegroundApp == targetPackage
     }
 
-    // 读取“是否接管通知”状态，默认返回 false (不接管)
+    // 读取接管通知开关 / Read the notification takeover toggle.
     fun isTakeOverNotifications(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(KEY_TAKE_OVER_NOTIFICATIONS, false)
     }
 
-    // 保存“是否接管通知”状态
+    // 保存接管通知开关 / Save the notification takeover toggle.
     fun setTakeOverNotifications(context: Context, takeOver: Boolean) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit { putBoolean(KEY_TAKE_OVER_NOTIFICATIONS, takeOver) }
+    }
+
+    fun isBubbleSnoozeEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_BUBBLE_SNOOZE_ENABLED, true)
+    }
+
+    fun setBubbleSnoozeEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit { putBoolean(KEY_BUBBLE_SNOOZE_ENABLED, enabled) }
     }
 
     fun snoozeBubbles(context: Context, durationMs: Long) {

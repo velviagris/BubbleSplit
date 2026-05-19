@@ -1,4 +1,4 @@
-package com.velviagris.bubblesplit
+package com.velviagris.bubblesplit.service
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -14,6 +14,10 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import android.os.Process
 import androidx.core.graphics.drawable.toBitmap
+import com.velviagris.bubblesplit.BubbleActivity
+import com.velviagris.bubblesplit.MainActivity
+import com.velviagris.bubblesplit.R
+import com.velviagris.bubblesplit.util.AppUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,9 +27,9 @@ import kotlinx.coroutines.cancel
 class BubbleNotificationListenerService : NotificationListenerService() {
 
     companion object {
-        // 只需记录对话时间，无需任何复杂的拦截屏蔽
+        // 记录最近一次气泡通知时间 / Track the latest bubble notification time.
         private var lastMessageTime = 0L
-        private const val COOLDOWN_TIME_MS = 10 * 60 * 1000L // 10分钟
+        private const val COOLDOWN_TIME_MS = 10 * 60 * 1000L // 10分钟 / 10 minutes.
         private const val MAIN_BUBBLE_NOTIFICATION_ID = 1001
     }
 
@@ -57,9 +61,15 @@ class BubbleNotificationListenerService : NotificationListenerService() {
                     return@launch
                 }
 
-                // 核心：接管原通知（秒杀系统的原生通知）
+                val currentTime = System.currentTimeMillis()
+                val isFreshStart = (currentTime - lastMessageTime) > COOLDOWN_TIME_MS
+                val isUpdate = !isFreshStart
+
+                // 接管原通知前先判断勿扰状态 / Check snooze before taking over the original notification.
                 val isTakeOver = AppUtils.isTakeOverNotifications(this@BubbleNotificationListenerService)
-                if (isTakeOver && AppUtils.isBubbleSnoozed(this@BubbleNotificationListenerService)) {
+                val isBubbleSnoozeEnabled = AppUtils.isBubbleSnoozeEnabled(this@BubbleNotificationListenerService)
+                if (isTakeOver && isBubbleSnoozeEnabled && (isUpdate || AppUtils.isBubbleSnoozed(this@BubbleNotificationListenerService))) {
+                    lastMessageTime = currentTime
                     return@launch
                 }
 
@@ -68,21 +78,16 @@ class BubbleNotificationListenerService : NotificationListenerService() {
                 }
 
                 AppUtils.setAutoLaunchTarget(pkg, 10000L)
-
-                val currentTime = System.currentTimeMillis()
-                val isFreshStart = (currentTime - lastMessageTime) > COOLDOWN_TIME_MS
                 lastMessageTime = currentTime
 
-                // 去除所有死气泡拦截！只要有消息，永远构建并发送咱们的 1001 通知。
-                // 如果是冷却期内的消息 (isUpdate = true)，它会静默更新到通知栏。
-                val isUpdate = !isFreshStart
+                // 非勿扰路径继续发布 BubbleSplit 通知 / Outside snooze, keep publishing the BubbleSplit notification.
 
                 val appName = AppUtils.getAppName(this@BubbleNotificationListenerService, pkg)
                 val extras = notification.extras
                 val title = extras.getString(Notification.EXTRA_TITLE) ?: appName
                 val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
 
-                // 提取原应用的跳转意图
+                // 提取原应用跳转意图 / Reuse the source app content intent when available.
                 val originalContentIntent = notification.contentIntent
 
                 updateMainBubble(pkg, appName, title, text, originalContentIntent, isUpdate)
@@ -105,7 +110,7 @@ class BubbleNotificationListenerService : NotificationListenerService() {
                 reason == REASON_CANCEL_ALL ||
                 reason == REASON_USER_STOPPED
 
-        if (isUserDismissal) {
+        if (isUserDismissal && AppUtils.isBubbleSnoozeEnabled(this)) {
             AppUtils.snoozeBubbles(this, COOLDOWN_TIME_MS)
         }
     }
@@ -135,8 +140,7 @@ class BubbleNotificationListenerService : NotificationListenerService() {
             .setImportant(true)
             .build()
 
-        // ==================== 意图分流 1：气泡行为 ====================
-        // 绑给气泡的 Intent：拉起我们自己的 BubbleActivity (分屏控制台)
+        // 气泡行为意图 / Bubble action intent: open BubbleActivity as the split-screen console.
         val targetIntent = Intent(this, BubbleActivity::class.java)
         val bubbleIntent = PendingIntent.getActivity(
             this, 0, targetIntent,
@@ -145,9 +149,8 @@ class BubbleNotificationListenerService : NotificationListenerService() {
 
         val bubbleData = NotificationCompat.BubbleMetadata.Builder(bubbleIntent, icon)
             .setDesiredHeight(600)
-            .setAutoExpandBubble(false) // 默认不强行弹脸，遵循系统习惯
+            .setAutoExpandBubble(false) // 默认不强行弹脸 / Let Android decide when to expand.
             .build()
-        // ==============================================================
 
         val shortcutIntent = Intent(this, MainActivity::class.java).apply { action = Intent.ACTION_MAIN }
         val shortcut = ShortcutInfoCompat.Builder(this, shortcutId)
@@ -163,27 +166,25 @@ class BubbleNotificationListenerService : NotificationListenerService() {
         val style = NotificationCompat.MessagingStyle(chatPartner)
             .addMessage("$title: $text", System.currentTimeMillis(), chatPartner)
 
-        // ==================== 意图分流 2：主体行为 ====================
-        // 绑给通知主体的 Intent：优先使用原应用的跳转逻辑
+        // 通知主体意图 / Notification body intent: prefer the source app behavior.
         val fallbackIntent = PendingIntent.getActivity(
             this, 1, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val finalContentIntent = originalContentIntent ?: fallbackIntent
-        // ==============================================================
 
         val builder = NotificationCompat.Builder(this, channelId)
             .setContentTitle(title)
             .setContentText(text)
-            .setContentIntent(finalContentIntent) // 【核心绑定】：点击文字卡片主体 -> 全屏进入微信
+            .setContentIntent(finalContentIntent) // 点击通知主体 / Tap the notification body.
             .setSmallIcon(R.drawable.ic_notification)
             .setStyle(style)
-            .setBubbleMetadata(bubbleData)        // 【核心绑定】：点击右下角气泡图标 -> 展开分屏控制台
+            .setBubbleMetadata(bubbleData)        // 绑定气泡入口 / Bind the bubble entry point.
             .setShortcutId(shortcutId)
             .addPerson(chatPartner)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setOnlyAlertOnce(isUpdate) // 短时间内收到多条消息，只在通知栏安静更新文本，不反复叮咚
-            .setAutoCancel(true)        // 点击通知主体后，自动清除通知卡片
+            .setOnlyAlertOnce(isUpdate) // 更新时静默 / Quietly update repeated messages.
+            .setAutoCancel(true)        // 点击后清除通知 / Clear after tapping the notification.
 
         try {
             NotificationManagerCompat.from(this).notify(MAIN_BUBBLE_NOTIFICATION_ID, builder.build())

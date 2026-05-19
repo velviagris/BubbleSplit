@@ -1,4 +1,4 @@
-package com.velviagris.bubblesplit
+package com.velviagris.bubblesplit.ui.screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -22,6 +22,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import com.velviagris.bubblesplit.R
+import com.velviagris.bubblesplit.model.AppItem
+import com.velviagris.bubblesplit.util.AppUtils
 import com.velviagris.bubblesplit.ui.theme.BubbleSplitTheme
 
 @Composable
@@ -39,7 +42,7 @@ fun AppSelectorScreen(onBack: () -> Unit) {
             selectedPackages = AppUtils.getSelectedApps(context)
             isLoading = false
         } else {
-            // screen preview test data
+            // 预览测试数据 / Preview-only test data.
             appList = listOf(
                 AppItem("微信", "com.tencent.mm", ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)!!),
                 AppItem("哔哩哔哩", "tv.danmaku.bili", ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)!!)

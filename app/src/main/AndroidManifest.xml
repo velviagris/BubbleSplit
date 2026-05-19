@@ -40,8 +40,8 @@
             android:resizeableActivity="true"/>
 
         <service
-            android:name=".BubbleNotificationListenerService"
-            android:label="BubblePopup 通知监听"
+            android:name=".service.BubbleNotificationListenerService"
+            android:label="@string/notification_listener_label"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>

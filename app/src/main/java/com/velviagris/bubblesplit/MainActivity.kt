@@ -27,7 +27,11 @@ import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.velviagris.bubblesplit.ui.screen.AboutScreen
+import com.velviagris.bubblesplit.ui.screen.AppSelectorScreen
+import com.velviagris.bubblesplit.ui.screen.SettingsScreen
 import com.velviagris.bubblesplit.ui.theme.BubbleSplitTheme
+import com.velviagris.bubblesplit.util.AppUtils
 
 class MainActivity : ComponentActivity() {
 
@@ -97,7 +101,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 处理 Activity 处于后台时再次被启动的情况
+    // 处理后台再次启动 / Handle relaunches while the Activity is in the background.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -106,8 +110,6 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == ACTION_SHOW_BUBBLE) {
             sendBubbleNotification()
-            // 如果你希望点击快捷方式唤醒气泡后，主界面自动收起/关闭，可以加上 finish()
-            // finish()
         }
     }
 

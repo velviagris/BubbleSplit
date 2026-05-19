@@ -27,6 +27,7 @@
     <string name="about_project_url">Project URL:</string>
 
     <string name="notif_channel_name">Bubble Notifications</string>
+    <string name="notification_listener_label">BubbleSplit Notification Listener</string>
     <string name="notif_partner_name">App Center</string>
     <string name="notif_main_msg">Tap the bubble icon to open the split-screen console!</string>
     <string name="notif_dynamic_msg">Tap to open</string>
@@ -35,6 +36,8 @@
 
     <string name="setting_take_over_title">Take Over Notifications</string>
     <string name="setting_take_over_desc">Replace original notifications with bubbles when enabled; show both when disabled.</string>
+    <string name="setting_bubble_snooze_title">Enable Bubble Snooze</string>
+    <string name="setting_bubble_snooze_desc">After a bubble is dismissed, no bubble will pop up again for 10 min. If Take Over Notifications is enabled, the original notification will be shown during this time.</string>
 
     <string name="shortcut_show_bubble">Show Bubble</string>
 </resources>

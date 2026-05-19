@@ -1,4 +1,4 @@
-package com.velviagris.bubblesplit
+package com.velviagris.bubblesplit.ui.screen
 
 import android.Manifest
 import android.content.Intent
@@ -26,6 +26,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.velviagris.bubblesplit.R
+import com.velviagris.bubblesplit.util.AppUtils
 import com.velviagris.bubblesplit.ui.theme.BubbleSplitTheme
 
 @Composable
@@ -34,6 +36,7 @@ fun SettingsScreen(onNavigateToSelector: () -> Unit, onSendNotification: () -> U
     var hasListenerPermission by remember { mutableStateOf(false) }
     var hasUsagePermission by remember { mutableStateOf(false) }
     var isTakeOver by remember { mutableStateOf(false) }
+    var isBubbleSnoozeEnabled by remember { mutableStateOf(true) }
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -48,6 +51,7 @@ fun SettingsScreen(onNavigateToSelector: () -> Unit, onSendNotification: () -> U
                     hasListenerPermission = enabledListeners.contains(context.packageName)
                     hasUsagePermission = AppUtils.hasUsageStatsPermission(context)
                     isTakeOver = AppUtils.isTakeOverNotifications(context)
+                    isBubbleSnoozeEnabled = AppUtils.isBubbleSnoozeEnabled(context)
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
@@ -122,6 +126,16 @@ fun SettingsScreen(onNavigateToSelector: () -> Unit, onSendNotification: () -> U
             }
         )
 
+        SettingSwitchCard(
+            title = stringResource(R.string.setting_bubble_snooze_title),
+            subtitle = stringResource(R.string.setting_bubble_snooze_desc),
+            checked = isBubbleSnoozeEnabled,
+            onCheckedChange = {
+                isBubbleSnoozeEnabled = it
+                AppUtils.setBubbleSnoozeEnabled(context, it)
+            }
+        )
+
         SettingCard(
             title = stringResource(R.string.setting_apps_title),
             subtitle = if (selectedCount > 0) stringResource(id = R.string.setting_apps_count, selectedCount) else stringResource(R.string.setting_apps_empty),
@@ -163,7 +177,7 @@ fun SettingSwitchCard(title: String, subtitle: String, checked: Boolean, onCheck
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onCheckedChange(!checked) } // 点击整个卡片也能切换开关
+            .clickable { onCheckedChange(!checked) } // 点击卡片切换 / Toggle when the whole card is tapped.
     ) {
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -172,7 +186,7 @@ fun SettingSwitchCard(title: String, subtitle: String, checked: Boolean, onCheck
             trailingContent = {
                 Switch(
                     checked = checked,
-                    onCheckedChange = null // null 代表点击事件已由外层 Card 接管
+                    onCheckedChange = null // 外层 Card 接管点击 / The outer Card owns click handling.
                 )
             }
         )
