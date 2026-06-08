@@ -44,10 +44,29 @@ class TrampolineActivity : Activity() {
                     addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 if (launchIntent != null) {
+                    val config = resources.configuration
+                    val isLandscape = config.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                    val displayMetrics = resources.displayMetrics
+                    val screenWidth = displayMetrics.widthPixels
+                    val screenHeight = displayMetrics.heightPixels
+
+                    val bounds = if (isLandscape) {
+                        android.graphics.Rect(0, 0, screenWidth / 2, screenHeight)
+                    } else {
+                        android.graphics.Rect(0, 0, screenWidth, screenHeight / 2)
+                    }
+
+                    val options = android.app.ActivityOptions.makeBasic().setLaunchBounds(bounds)
+
                     try {
-                        startActivity(launchIntent)
+                        startActivity(launchIntent, options.toBundle())
                     } catch (e: Exception) {
                         e.printStackTrace()
+                        try {
+                            startActivity(launchIntent)
+                        } catch (ex: Exception) {
+                            ex.printStackTrace()
+                        }
                     }
                 }
             }
